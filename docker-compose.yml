@@ -1,5 +1,5 @@
 # fullstack-filament-nextjs/docker-compose.yml
-version: '3.8'
+# version: '3.8'
 
 services:
   # 1. Layanan Database (PostgreSQL)

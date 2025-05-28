@@ -11,7 +11,6 @@ RUN apk add --no-cache \
     git \
     supervisor \
     nginx \
-    libzip \
     libzip-dev \
     libpng-dev \
     libxml2-dev \
@@ -65,7 +64,7 @@ FROM php:8.3-fpm-alpine
 WORKDIR /var/www/html
 
 # Install only production runtime libraries
-RUN apk add --no-cache postgresql-libs libxml2 libpng oniguruma icu-libs
+RUN apk add --no-cache postgresql-libs libxml2 libpng oniguruma icu-libs libzip
 
 # Salin kode aplikasi yang sudah di-build
 COPY --from=builder /var/www/html .

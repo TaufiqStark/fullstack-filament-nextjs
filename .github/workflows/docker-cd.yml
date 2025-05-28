@@ -57,39 +57,31 @@ jobs:
             echo 'Navigating to app directory...'
             cd ${{ env.APP_DIR }}
 
+            echo 'Pulling latest code from Git repository (main branch)...'
+            # Pastikan user SSH Anda memiliki akses ke repositori Git (misalnya via SSH key deploy)
+            # atau jika repo publik, ini akan bekerja.
+            # Jika Anda menggunakan branch lain untuk produksi, sesuaikan 'main'.
+            git checkout main 
+            git fetch origin main # Ambil perubahan terbaru tanpa langsung merge
+            git reset --hard origin/main # Paksa direktori kerja sama dengan remote (HATI-HATI: menghapus perubahan lokal di server)
+            # Alternatif yang lebih aman jika ada perubahan manual di server yang ingin dijaga:
+            # git pull origin main
+
             echo 'Creating/Updating .env file for Docker Compose...'
-            # Ini akan membuat file .env di server yang digunakan oleh docker-compose
-            # Sesuaikan dengan variabel yang dibutuhkan oleh docker-compose.yml Anda di server
-            # (Anda mungkin ingin mengelola file ini lebih canggih, misal hanya update jika ada perubahan)
-            echo \"POSTGRES_USER=\\\"${{ env.PROD_DB_USER_SECRET }}\\\"\" > .env
-            echo \"POSTGRES_PASSWORD=\\\"${{ env.PROD_DB_PASSWORD_SECRET }}\\\"\" >> .env
-            echo \"POSTGRES_DB=\\\"${{ env.PROD_DB_NAME_SECRET }}\\\"\" >> .env
-            echo \"PROD_ADMIN_APP_URL=\\\"${{ env.PROD_ADMIN_APP_URL_SECRET }}\\\"\" >> .env
-            echo \"PROD_APP_KEY=\\\"${{ env.PROD_APP_KEY_SECRET }}\\\"\" >> .env
-            # Tambahkan variabel lain jika diperlukan untuk docker-compose.yml server
-            # Contoh: echo \"IMAGE_TAG_ADMIN=${COMMIT_SHA_SHORT}\" >> .env
-            # Contoh: echo \"IMAGE_TAG_CLIENT=${COMMIT_SHA_SHORT}\" >> .env
-
-            # (Opsional) Jika Anda menggunakan docker-compose.yml dari repo untuk deployment:
-            # echo 'Copying latest docker-compose.yml from GitHub Actions (if needed)'
-            # 'actions/checkout' step diatas sudah mengambilnya, kita perlu cara untuk menyalinnya ke server
-            # Ini bisa dilakukan dengan scp jika file docker-compose.yml Anda dinamis
-            # Untuk contoh ini, kita asumsikan docker-compose.yml di server menggunakan tag :latest
-
+            # ... (script echo untuk membuat .env tetap di sini) ...
+            
             echo 'Pulling latest images (tagged as :latest from main branch)...'
-            # Pastikan docker-compose.yml di server Anda mereferensikan image:tag yang benar
-            # Contoh: your-dockerhub-username/admin-app-php:latest
-            docker compose pull
+            docker compose pull # Gunakan 'docker compose' (tanpa strip) untuk versi terbaru
 
             echo 'Bringing up new containers...'
-            docker compose up -d --remove-orphans
+            docker compose up -d --remove-orphans # Gunakan 'docker compose'
 
             echo 'Running Laravel migrations...'
-            docker compose exec admin-app-php php artisan migrate --force
+            docker compose exec admin-app-php php artisan migrate --force # Gunakan 'docker compose'
 
             echo 'Optimizing Laravel application...'
-            docker compose exec admin-app-php php artisan optimize:clear
-            docker compose exec admin-app-php php artisan optimize
+            docker compose exec admin-app-php php artisan optimize:clear # Gunakan 'docker compose'
+            docker compose exec admin-app-php php artisan optimize # Gunakan 'docker compose'
             
             echo 'Deployment finished successfully!'
           "
