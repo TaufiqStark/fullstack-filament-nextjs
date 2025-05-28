@@ -38,6 +38,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 COPY . .
 
 # Install composer dependencies
+# COPY composer.json composer.lock ./
 RUN composer install --optimize-autoloader --no-dev --no-interaction --no-plugins --no-scripts
 
 # Generate app key if not set
