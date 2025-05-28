@@ -88,6 +88,7 @@ jobs:
             # Contoh penambahan variabel lain untuk docker-compose.prod.yml jika diperlukan
             echo \"PROD_CLIENT_PORT=80\" >> .env
             echo \"PROD_ADMIN_PORT=8080\" >> .env
+            echo \"CACHE_STORE=file\" >> .env
             # echo \"PROD_SESSION_DRIVER=database\" >> .env 
             # echo \"PROD_CACHE_DRIVER=redis\" >> .env
             # echo \"PROD_REDIS_HOST=redis\" >> .env # Jika Anda menambahkan service Redis

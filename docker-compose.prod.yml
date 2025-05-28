@@ -45,6 +45,7 @@ services:
       SESSION_DRIVER: ${PROD_SESSION_DRIVER:-database}
       SESSION_CONNECTION: ${PROD_SESSION_CONNECTION:-db} # Jika SESSION_DRIVER=database
       CACHE_DRIVER: ${PROD_CACHE_DRIVER:-file}
+      CACHE_STORE: ${PROD_CACHE_STORE:-file}
       QUEUE_CONNECTION: ${PROD_QUEUE_CONNECTION:-sync}
       # Tambahkan variabel lain yang dibutuhkan Laravel di produksi
     depends_on:
