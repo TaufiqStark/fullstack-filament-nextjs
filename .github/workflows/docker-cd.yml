@@ -87,7 +87,7 @@ jobs:
             
             # Contoh penambahan variabel lain untuk docker-compose.prod.yml jika diperlukan
             echo \"PROD_CLIENT_PORT=80\" >> .env
-            echo \"PROD_ADMIN_PORT=8001\" >> .env
+            echo \"PROD_ADMIN_PORT=8080\" >> .env
             # echo \"PROD_SESSION_DRIVER=database\" >> .env 
             # echo \"PROD_CACHE_DRIVER=redis\" >> .env
             # echo \"PROD_REDIS_HOST=redis\" >> .env # Jika Anda menambahkan service Redis
@@ -103,6 +103,14 @@ jobs:
             echo '== Bringing up new containers with Docker Compose =='
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
+            echo '== Clearing and Caching Laravel for production (BEFORE MIGRATE) =='
+            # Langkah ini penting untuk memastikan Laravel menggunakan ENV produksi
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize:clear
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan config:cache 
+            # Anda juga bisa menjalankan route:cache dan view:cache di sini jika mau,
+            # atau biarkan 'php artisan optimize' di akhir yang menanganinya.
+            # Cukup config:cache sebelum migrate sudah sangat membantu.
+            
             echo '== Running Laravel migrations =='
             # Pastikan nama service 'admin-app-php' sesuai dengan di docker-compose.prod.yml
             docker compose -f docker-compose.prod.yml exec admin-app-php php artisan migrate --force
