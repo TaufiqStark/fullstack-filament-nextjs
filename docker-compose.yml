@@ -35,7 +35,7 @@ services:
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       # Untuk getServerSideProps agar tahu URL API internalnya
-      NEXT_PUBLIC_API_URL: http://client-app:3000/api/data # Menggunakan nama service dan port internal
+      NEXT_PUBLIC_API_URL: http://client-app:3000/ # Menggunakan nama service dan port internal
     depends_on:
       - db
     networks:
