@@ -1,0 +1,102 @@
+# proyek-fullstack/docker-compose.prod.yml
+# version: '3.8' # Bisa dihapus jika Docker Compose Anda versi terbaru
+
+services:
+  # Layanan Database (PostgreSQL)
+  db:
+    image: postgres:14-alpine
+    container_name: prod_db
+    restart: unless-stopped
+    environment:
+      # Variabel ini akan diambil dari file .env di server yang dibuat oleh CD
+      POSTGRES_USER: ${PROD_DB_USER}
+      POSTGRES_PASSWORD: ${PROD_DB_PASSWORD}
+      POSTGRES_DB: ${PROD_DB_NAME}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data # Volume persistent untuk data DB
+    # Port tidak perlu di-expose ke host kecuali Anda butuh akses DB langsung dari luar jaringan Docker
+    # ports:
+    #   - "5432:5432"
+    networks:
+      - app_network_prod
+
+  # Aplikasi Admin - PHP-FPM (Laravel)
+  admin-app-php:
+    image: ${{DOCKERHUB_USERNAME}}admin-app-php:${IMAGE_TAG_ADMIN:-latest} # Image dari registry
+    container_name: prod_admin_app_php
+    restart: unless-stopped
+    volumes:
+      # Volume persistent untuk storage Laravel (uploads, logs, cache jika file based)
+      - admin_storage_prod:/var/www/html/storage
+      - admin_bootstrap_cache_prod:/var/www/html/bootstrap/cache
+    environment:
+      # Variabel ini akan diambil dari file .env di server yang dibuat oleh CD
+      APP_ENV: production
+      APP_DEBUG: false
+      APP_URL: ${PROD_ADMIN_APP_URL}
+      APP_KEY: ${PROD_APP_KEY}
+      DB_CONNECTION: pgsql
+      DB_HOST: db # Nama service database
+      DB_PORT: 5432
+      DB_DATABASE: ${PROD_DB_NAME}
+      DB_USERNAME: ${PROD_DB_USER}
+      DB_PASSWORD: ${PROD_DB_PASSWORD}
+      # Konfigurasi produksi lainnya
+      SESSION_DRIVER: ${PROD_SESSION_DRIVER:-database}
+      SESSION_CONNECTION: ${PROD_SESSION_CONNECTION:-db} # Jika SESSION_DRIVER=database
+      CACHE_DRIVER: ${PROD_CACHE_DRIVER:-file}
+      QUEUE_CONNECTION: ${PROD_QUEUE_CONNECTION:-sync}
+      # Tambahkan variabel lain yang dibutuhkan Laravel di produksi
+    depends_on:
+      - db
+    networks:
+      - app_network_prod
+
+  # Aplikasi Admin - Nginx Web Server
+  admin-app-nginx:
+    image: nginx:1.25-alpine
+    container_name: prod_admin_app_nginx
+    restart: unless-stopped
+    ports:
+      - "${PROD_ADMIN_PORT:-8001}:80" # Port untuk admin, misal 8001 atau diatur via reverse proxy
+    volumes:
+      # Anda perlu memastikan nginx.conf ada di server di path yang benar
+      # atau salin dari repo saat CD jika berubah
+      - ./admin-app/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Nginx mungkin perlu akses read-only ke beberapa bagian public jika tidak semua aset ada di image PHP
+      # Jika aset sudah di-handle oleh image PHP, ini mungkin tidak perlu
+      # - ./admin-app/public:/var/www/html/public:ro 
+      # Volume untuk storage jika Nginx perlu serve file dari sana (misal, jika tidak via PHP)
+      - admin_storage_prod:/var/www/html/storage:ro
+    depends_on:
+      - admin-app-php
+    networks:
+      - app_network_prod
+
+  # Aplikasi Client (Next.js)
+  client-app:
+    image: ${{DOCKERHUB_USERNAME}}client-app:${IMAGE_TAG_CLIENT:-latest} # Image dari registry
+    container_name: prod_client_app
+    restart: unless-stopped
+    ports:
+      - "${PROD_CLIENT_PORT:-80}:3000" # Client biasanya di port 80 (HTTP) atau 443 (HTTPS via reverse proxy)
+    environment:
+      NODE_ENV: production
+      PORT: 3000 # Port internal Next.js
+      # NEXT_PUBLIC_API_URL sudah di-bake ke dalam image saat build oleh CI
+      # Jika ada ENV runtime lain yang dibutuhkan Next.js, tambahkan di sini
+      # dan ambil dari .env server
+      # ANOTHER_CLIENT_ENV_VAR: ${PROD_ANOTHER_CLIENT_ENV_VAR}
+    depends_on:
+      - db # Jika client butuh DB langsung, atau admin-app-php jika API-nya di sana
+    networks:
+      - app_network_prod
+
+volumes:
+  postgres_data_prod:
+  admin_storage_prod:
+  admin_bootstrap_cache_prod:
+
+networks:
+  app_network_prod:
+    driver: bridge
