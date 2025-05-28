@@ -16,10 +16,11 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Checkout Repository (jika butuh file dari repo, misal docker-compose.yml terbaru)
+      - name: Checkout Repository 
+        # Diperlukan jika docker-compose.prod.yml atau skrip lain di repo ingin disalin/digunakan
+        # atau jika git pull di server mengambil dari ref yang sama
         uses: actions/checkout@v4
         with:
-          # Mengambil commit yang sama dengan yang memicu workflow_run
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup SSH Agent
@@ -35,53 +36,80 @@ jobs:
       
       - name: Deploy to Server
         env:
+          # Variabel untuk koneksi SSH
           DEPLOY_USER: ${{ secrets.DEPLOY_SERVER_USER }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_SERVER_HOST }}
           APP_DIR: /home/ubuntu/fullstack-filament-nextjs # GANTI DENGAN PATH APLIKASI ANDA DI SERVER
-          # Variabel untuk .env di server
-          PROD_DB_USER_SECRET: ${{ secrets.PROD_DB_USER }}
-          PROD_DB_PASSWORD_SECRET: ${{ secrets.PROD_DB_PASSWORD }}
-          PROD_DB_NAME_SECRET: ${{ secrets.PROD_DB_NAME }}
-          PROD_ADMIN_APP_URL_SECRET: ${{ secrets.PROD_ADMIN_APP_URL }}
-          PROD_APP_KEY_SECRET: ${{ secrets.PROD_APP_KEY }}
-          # Tambahkan secret lain jika perlu
+
+          # Secrets yang akan ditulis ke .env di server
+          # Ini akan dibaca oleh docker-compose.prod.yml di server
+          SECRET_DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }} # Untuk nama image
+          SECRET_PROD_DB_USER: ${{ secrets.PROD_DB_USER }}
+          SECRET_PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+          SECRET_PROD_DB_NAME: ${{ secrets.PROD_DB_NAME }}
+          SECRET_PROD_ADMIN_APP_URL: ${{ secrets.PROD_ADMIN_APP_URL }}
+          SECRET_PROD_APP_KEY: ${{ secrets.PROD_APP_KEY }}
+          # Tambahkan secret lain jika perlu, misal untuk Redis, Mail, dll.
 
         run: |
           echo "Deploying latest version to server ${{ env.DEPLOY_HOST }}..."
+          # Mendapatkan short SHA dari commit yang memicu workflow_run (yang berasal dari CI)
           COMMIT_SHA_SHORT=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
           echo "Based on commit: $COMMIT_SHA_SHORT"
 
           ssh -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
             set -e # Script akan exit jika ada error
 
-            echo 'Navigating to app directory...'
+            echo '== Navigating to app directory =='
             cd ${{ env.APP_DIR }}
 
-            echo 'Pulling latest code from Git repository (main branch)...'
-            # Pastikan user SSH Anda memiliki akses ke repositori Git (misalnya via SSH key deploy)
-            # atau jika repo publik, ini akan bekerja.
-            # Jika Anda menggunakan branch lain untuk produksi, sesuaikan 'main'.
+            echo '== Pulling latest code from Git repository (main branch) =='
+            # Pastikan user SSH Anda memiliki akses ke repositori Git
+            # Jika repo privat, SSH deploy key mungkin diperlukan di server untuk git pull
             git checkout main 
-            git fetch origin main # Ambil perubahan terbaru tanpa langsung merge
-            # git reset --hard origin/main # Paksa direktori kerja sama dengan remote (HATI-HATI: menghapus perubahan lokal di server)
-            # Alternatif yang lebih aman jika ada perubahan manual di server yang ingin dijaga:
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main # Memastikan server sama dengan remote, HATI-HATI menghapus perubahan lokal di server
 
-            echo 'Creating/Updating .env file for Docker Compose...'
-            # ... (script echo untuk membuat .env tetap di sini) ...
+            echo '== Creating/Updating .env file for Docker Compose =='
+            # File .env ini akan dibaca oleh docker-compose -f docker-compose.prod.yml
+            # Nama variabel di KIRI adalah yang akan digunakan di docker-compose.prod.yml
+            # Nilai di KANAN diambil dari GitHub Secrets via env di atas
+            echo \"DOCKERHUB_USERNAME=\\\"${{ env.SECRET_DOCKERHUB_USERNAME }}\\\"\" > .env
+            echo \"IMAGE_TAG_ADMIN=${COMMIT_SHA_SHORT}\" >> .env # Atau 'latest' jika Anda lebih suka
+            echo \"IMAGE_TAG_CLIENT=${COMMIT_SHA_SHORT}\" >> .env # Atau 'latest'
+
+            echo \"PROD_DB_USER=\\\"${{ env.SECRET_PROD_DB_USER }}\\\"\" >> .env
+            echo \"PROD_DB_PASSWORD=\\\"${{ env.SECRET_PROD_DB_PASSWORD }}\\\"\" >> .env
+            echo \"PROD_DB_NAME=\\\"${{ env.SECRET_PROD_DB_NAME }}\\\"\" >> .env
             
-            echo 'Pulling latest images (tagged as :latest from main branch)...'
-            docker compose -f docker-compose.prod.yml pull # Gunakan 'docker compose' (tanpa strip) untuk versi terbaru
-
-            echo 'Bringing up new containers...'
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans # Gunakan 'docker compose'
-
-            echo 'Running Laravel migrations...'
-            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan migrate --force # Gunakan 'docker compose'
-
-            echo 'Optimizing Laravel application...'
-            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize:clear # Gunakan 'docker compose'
-            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize # Gunakan 'docker compose'
+            echo \"PROD_ADMIN_APP_URL=\\\"${{ env.SECRET_PROD_ADMIN_APP_URL }}\\\"\" >> .env
+            echo \"PROD_APP_KEY=\\\"${{ env.SECRET_PROD_APP_KEY }}\\\"\" >> .env
             
-            echo 'Deployment finished successfully!'
+            # Contoh penambahan variabel lain untuk docker-compose.prod.yml jika diperlukan
+            echo \"PROD_CLIENT_PORT=80\" >> .env
+            echo \"PROD_ADMIN_PORT=8001\" >> .env
+            # echo \"PROD_SESSION_DRIVER=database\" >> .env 
+            # echo \"PROD_CACHE_DRIVER=redis\" >> .env
+            # echo \"PROD_REDIS_HOST=redis\" >> .env # Jika Anda menambahkan service Redis
+
+            echo '.env file on server created/updated:'
+            cat .env # Cetak isi .env untuk debugging (hapus jika tidak ingin terlihat di log)
+
+            echo '== Pulling latest images from Docker Hub =='
+            # Menggunakan -f untuk menunjuk ke file docker-compose.prod.yml
+            # Docker Compose akan menggunakan .env yang baru dibuat untuk substitusi variabel
+            docker compose -f docker-compose.prod.yml pull
+
+            echo '== Bringing up new containers with Docker Compose =='
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo '== Running Laravel migrations =='
+            # Pastikan nama service 'admin-app-php' sesuai dengan di docker-compose.prod.yml
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan migrate --force
+
+            echo '== Optimizing Laravel application =='
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize:clear
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize
+            
+            echo '== Deployment finished successfully! =='
           "

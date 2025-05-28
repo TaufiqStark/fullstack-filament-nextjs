@@ -22,7 +22,7 @@ services:
 
   # Aplikasi Admin - PHP-FPM (Laravel)
   admin-app-php:
-    image: ${{DOCKERHUB_USERNAME}}admin-app-php:${IMAGE_TAG_ADMIN:-latest} # Image dari registry
+    image: ${DOCKERHUB_USERNAME}/admin-app-php:${IMAGE_TAG_ADMIN:-latest} # Image dari registry
     container_name: prod_admin_app_php
     restart: unless-stopped
     volumes:
@@ -58,7 +58,7 @@ services:
     container_name: prod_admin_app_nginx
     restart: unless-stopped
     ports:
-      - "${PROD_ADMIN_PORT:-8001}:80" # Port untuk admin, misal 8001 atau diatur via reverse proxy
+      - "${PROD_ADMIN_PORT:-8080}:80" # Port untuk admin, misal 8001 atau diatur via reverse proxy
     volumes:
       # Anda perlu memastikan nginx.conf ada di server di path yang benar
       # atau salin dari repo saat CD jika berubah
@@ -75,7 +75,7 @@ services:
 
   # Aplikasi Client (Next.js)
   client-app:
-    image: ${{DOCKERHUB_USERNAME}}client-app:${IMAGE_TAG_CLIENT:-latest} # Image dari registry
+    image: ${DOCKERHUB_USERNAME}/client-app:${IMAGE_TAG_CLIENT:-latest} # Image dari registry
     container_name: prod_client_app
     restart: unless-stopped
     ports:
