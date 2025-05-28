@@ -1,0 +1,28 @@
+# Direktori Git
+.git
+.gitignore
+
+# File environment lokal.
+# Sama seperti Laravel, ini penting untuk keamanan.
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Folder dependensi Node.js.
+# Ini akan di-install oleh perintah `npm install` atau `yarn` di dalam Dockerfile.
+# Mengirim folder node_modules lokal akan SANGAT memperlambat build.
+node_modules/
+
+# Build artifact dari Next.js.
+# Folder ini akan dibuat oleh perintah `npm run build` di dalam Dockerfile.
+.next/
+
+# File log
+npm-debug.log*
+yarn-error.log
+
+# File spesifik sistem operasi dan IDE
+.DS_Store
+.idea/
+.vscode/
