@@ -78,6 +78,8 @@ RUN php artisan config:cache
 RUN php artisan route:cache
 RUN php artisan view:cache
 
+RUN rm .env 
+
 # --- Tahap 2: Final Production Image ---
 FROM php:8.3-fpm-alpine
 

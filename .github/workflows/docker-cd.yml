@@ -103,21 +103,34 @@ jobs:
             echo '== Bringing up new containers with Docker Compose =='
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            echo '== Clearing and Caching Laravel for production (BEFORE MIGRATE) =='
-            # Langkah ini penting untuk memastikan Laravel menggunakan ENV produksi
-            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize:clear
-            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan config:cache 
-            # Anda juga bisa menjalankan route:cache dan view:cache di sini jika mau,
-            # atau biarkan 'php artisan optimize' di akhir yang menanganinya.
-            # Cukup config:cache sebelum migrate sudah sangat membantu.
-            
+           echo '== Clearing ALL old Laravel Caches (important before recaching) =='
+            # Perintah ini akan mencoba menghapus semua cache yang ada.
+            # Jika CACHE_DRIVER adalah 'database' dan konfigurasinya masih salah, ini bisa error.
+            # Tapi kita perlu membersihkan cache config lama.
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan config:clear
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan route:clear
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan view:clear
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan cache:clear # Ini yang error sebelumnya
+
+            echo '== Caching Configuration FOR PRODUCTION =='
+            # Ini akan membuat bootstrap/cache/config.php menggunakan ENV produksi dari Docker Compose
+            # yang SEHARUSNYA sudah DB_CONNECTION=pgsql dan CACHE_DRIVER yang benar.
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan config:cache
+
+            # Sekarang config sudah benar, coba migrate
             echo '== Running Laravel migrations =='
-            # Pastikan nama service 'admin-app-php' sesuai dengan di docker-compose.prod.yml
             docker compose -f docker-compose.prod.yml exec admin-app-php php artisan migrate --force
 
-            echo '== Optimizing Laravel application =='
-            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize:clear
-            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize
+            echo '== Caching Routes and Views (Events if used) =='
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan route:cache
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan view:cache
+            # docker compose -f docker-compose.prod.yml exec admin-app-php php artisan event:cache # Jika Anda menggunakan event discovery
+
+            # 'php artisan optimize' adalah gabungan dari config:cache, route:cache, view:cache (dan event:cache di L11+)
+            # Karena kita sudah melakukannya secara terpisah, ini mungkin tidak perlu,
+            # atau bisa dijalankan sebagai langkah final untuk memastikan.
+            # echo '== Final Laravel Optimization (Redundant if above steps done) =='
+            # docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize
             
             echo '== Deployment finished successfully! =='
           "
