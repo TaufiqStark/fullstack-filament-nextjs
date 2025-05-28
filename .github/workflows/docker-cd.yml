@@ -2,7 +2,7 @@ name: Docker CD - Deploy to Server
 
 on:
   workflow_run:
-    workflows: ["Docker CI - Build & Push Docker Images"] # Nama workflow CI Anda
+    workflows: ["Docker CI - Build & Push Images"] # Nama workflow CI Anda
     types:
       - completed # Hanya berjalan jika workflow CI selesai
     branches:
