@@ -1,0 +1,95 @@
+name: CD - Deploy to Server
+
+on:
+  workflow_run:
+    workflows: ["CI - Build & Push Docker Images"] # Nama workflow CI Anda
+    types:
+      - completed # Hanya berjalan jika workflow CI selesai
+    branches:
+      - main # Hanya untuk branch main
+
+jobs:
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    # Hanya deploy jika workflow CI yang memicunya berhasil
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout Repository (jika butuh file dari repo, misal docker-compose.yml terbaru)
+        uses: actions/checkout@v4
+        with:
+          # Mengambil commit yang sama dengan yang memicu workflow_run
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_SERVER_HOST }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      
+      - name: Deploy to Server
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_SERVER_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_SERVER_HOST }}
+          APP_DIR: /home/ubuntu/fullstack-filament-nextjs # GANTI DENGAN PATH APLIKASI ANDA DI SERVER
+          # Variabel untuk .env di server
+          PROD_DB_USER_SECRET: ${{ secrets.PROD_DB_USER }}
+          PROD_DB_PASSWORD_SECRET: ${{ secrets.PROD_DB_PASSWORD }}
+          PROD_DB_NAME_SECRET: ${{ secrets.PROD_DB_NAME }}
+          PROD_ADMIN_APP_URL_SECRET: ${{ secrets.PROD_ADMIN_APP_URL }}
+          PROD_APP_KEY_SECRET: ${{ secrets.PROD_APP_KEY }}
+          # Tambahkan secret lain jika perlu
+
+        run: |
+          echo "Deploying latest version to server ${{ env.DEPLOY_HOST }}..."
+          COMMIT_SHA_SHORT=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          echo "Based on commit: $COMMIT_SHA_SHORT"
+
+          ssh -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
+            set -e # Script akan exit jika ada error
+
+            echo 'Navigating to app directory...'
+            cd ${{ env.APP_DIR }}
+
+            echo 'Creating/Updating .env file for Docker Compose...'
+            # Ini akan membuat file .env di server yang digunakan oleh docker-compose
+            # Sesuaikan dengan variabel yang dibutuhkan oleh docker-compose.yml Anda di server
+            # (Anda mungkin ingin mengelola file ini lebih canggih, misal hanya update jika ada perubahan)
+            echo \"POSTGRES_USER=\\\"${{ env.PROD_DB_USER_SECRET }}\\\"\" > .env
+            echo \"POSTGRES_PASSWORD=\\\"${{ env.PROD_DB_PASSWORD_SECRET }}\\\"\" >> .env
+            echo \"POSTGRES_DB=\\\"${{ env.PROD_DB_NAME_SECRET }}\\\"\" >> .env
+            echo \"PROD_ADMIN_APP_URL=\\\"${{ env.PROD_ADMIN_APP_URL_SECRET }}\\\"\" >> .env
+            echo \"PROD_APP_KEY=\\\"${{ env.PROD_APP_KEY_SECRET }}\\\"\" >> .env
+            # Tambahkan variabel lain jika diperlukan untuk docker-compose.yml server
+            # Contoh: echo \"IMAGE_TAG_ADMIN=${COMMIT_SHA_SHORT}\" >> .env
+            # Contoh: echo \"IMAGE_TAG_CLIENT=${COMMIT_SHA_SHORT}\" >> .env
+
+            # (Opsional) Jika Anda menggunakan docker-compose.yml dari repo untuk deployment:
+            # echo 'Copying latest docker-compose.yml from GitHub Actions (if needed)'
+            # 'actions/checkout' step diatas sudah mengambilnya, kita perlu cara untuk menyalinnya ke server
+            # Ini bisa dilakukan dengan scp jika file docker-compose.yml Anda dinamis
+            # Untuk contoh ini, kita asumsikan docker-compose.yml di server menggunakan tag :latest
+
+            echo 'Pulling latest images (tagged as :latest from main branch)...'
+            # Pastikan docker-compose.yml di server Anda mereferensikan image:tag yang benar
+            # Contoh: your-dockerhub-username/admin-app-php:latest
+            docker compose pull
+
+            echo 'Bringing up new containers...'
+            docker compose up -d --remove-orphans
+
+            echo 'Running Laravel migrations...'
+            docker compose exec admin-app-php php artisan migrate --force
+
+            echo 'Optimizing Laravel application...'
+            docker compose exec admin-app-php php artisan optimize:clear
+            docker compose exec admin-app-php php artisan optimize
+            
+            echo 'Deployment finished successfully!'
+          "

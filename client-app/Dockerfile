@@ -25,7 +25,7 @@ RUN npm run build
 # Tahap 2: Produksi - Menjalankan aplikasi
 FROM node:18-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 # Anda bisa menambahkan user non-root di sini untuk keamanan
 # RUN addgroup --system --gid 1001 nodejs
@@ -37,6 +37,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # USER nextjs # Jika menggunakan user non-root
 EXPOSE 3000
-ENV PORT 3000
+ENV PORT=3000
 
 CMD ["node", "server.js"]
