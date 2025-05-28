@@ -11,6 +11,7 @@ RUN apk add --no-cache \
     git \
     supervisor \
     nginx \
+    libzip \
     libzip-dev \
     libpng-dev \
     libxml2-dev \

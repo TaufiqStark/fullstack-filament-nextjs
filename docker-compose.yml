@@ -5,7 +5,7 @@ services:
   # 1. Layanan Database (PostgreSQL)
   db:
     image: postgres:14-alpine
-    container_name: shared_db
+    container_name: pg_shared_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: user_app
@@ -26,7 +26,7 @@ services:
     container_name: client_app_nextjs
     restart: unless-stopped
     ports:
-      - "8080:3000" # Akses Next.js di http://localhost:8080
+      - "80:3000" # Akses Next.js di http://localhost:8080
     environment:
       # Variabel ini akan digunakan oleh API route Next.js
       DB_HOST: db
