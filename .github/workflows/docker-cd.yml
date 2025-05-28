@@ -54,8 +54,8 @@ jobs:
         run: |
           echo "Deploying latest version to server ${{ env.DEPLOY_HOST }}..."
           # Mendapatkan short SHA dari commit yang memicu workflow_run (yang berasal dari CI)
-          COMMIT_SHA_SHORT=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
-          echo "Based on commit: $COMMIT_SHA_SHORT"
+          # COMMIT_SHA_SHORT=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          # echo "Based on commit: $COMMIT_SHA_SHORT"
 
           ssh -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "
             set -e # Script akan exit jika ada error
@@ -75,8 +75,8 @@ jobs:
             # Nama variabel di KIRI adalah yang akan digunakan di docker-compose.prod.yml
             # Nilai di KANAN diambil dari GitHub Secrets via env di atas
             echo \"DOCKERHUB_USERNAME=\\\"${{ env.SECRET_DOCKERHUB_USERNAME }}\\\"\" > .env
-            echo \"IMAGE_TAG_ADMIN=${COMMIT_SHA_SHORT}\" >> .env # Atau 'latest' jika Anda lebih suka
-            echo \"IMAGE_TAG_CLIENT=${COMMIT_SHA_SHORT}\" >> .env # Atau 'latest'
+            # echo \"IMAGE_TAG_ADMIN=${COMMIT_SHA_SHORT}\" >> .env # Atau 'latest' jika Anda lebih suka
+            # echo \"IMAGE_TAG_CLIENT=${COMMIT_SHA_SHORT}\" >> .env # Atau 'latest'
 
             echo \"PROD_DB_USER=\\\"${{ env.SECRET_PROD_DB_USER }}\\\"\" >> .env
             echo \"PROD_DB_PASSWORD=\\\"${{ env.SECRET_PROD_DB_PASSWORD }}\\\"\" >> .env
