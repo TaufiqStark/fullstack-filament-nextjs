@@ -63,25 +63,25 @@ jobs:
             # Jika Anda menggunakan branch lain untuk produksi, sesuaikan 'main'.
             git checkout main 
             git fetch origin main # Ambil perubahan terbaru tanpa langsung merge
-            git reset --hard origin/main # Paksa direktori kerja sama dengan remote (HATI-HATI: menghapus perubahan lokal di server)
+            # git reset --hard origin/main # Paksa direktori kerja sama dengan remote (HATI-HATI: menghapus perubahan lokal di server)
             # Alternatif yang lebih aman jika ada perubahan manual di server yang ingin dijaga:
-            # git pull origin main
+            git pull origin main
 
             echo 'Creating/Updating .env file for Docker Compose...'
             # ... (script echo untuk membuat .env tetap di sini) ...
             
             echo 'Pulling latest images (tagged as :latest from main branch)...'
-            docker compose pull # Gunakan 'docker compose' (tanpa strip) untuk versi terbaru
+            docker compose -f docker-compose.prod.yml pull # Gunakan 'docker compose' (tanpa strip) untuk versi terbaru
 
             echo 'Bringing up new containers...'
-            docker compose up -d --remove-orphans # Gunakan 'docker compose'
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans # Gunakan 'docker compose'
 
             echo 'Running Laravel migrations...'
-            docker compose exec admin-app-php php artisan migrate --force # Gunakan 'docker compose'
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan migrate --force # Gunakan 'docker compose'
 
             echo 'Optimizing Laravel application...'
-            docker compose exec admin-app-php php artisan optimize:clear # Gunakan 'docker compose'
-            docker compose exec admin-app-php php artisan optimize # Gunakan 'docker compose'
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize:clear # Gunakan 'docker compose'
+            docker compose -f docker-compose.prod.yml exec admin-app-php php artisan optimize # Gunakan 'docker compose'
             
             echo 'Deployment finished successfully!'
           "
