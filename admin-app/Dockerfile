@@ -58,8 +58,6 @@ COPY . .
 # Di produksi, ENV vars akan di-inject oleh Docker Compose dari .env server
 RUN if [ ! -f ".env" ]; then cp .env.example .env; fi
 
-# Generate APP_KEY (akan ditulis ke .env di build context ini)
-RUN php artisan key:generate
 
 # Siapkan direktori storage dan bootstrap/cache, lalu atur izin
 # Ini penting agar artisan command berikutnya tidak error
@@ -69,6 +67,9 @@ RUN mkdir -p storage/framework/sessions \
              bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
+
+# Generate APP_KEY (akan ditulis ke .env di build context ini)
+RUN php artisan key:generate
 
 # Jalankan perintah optimasi Laravel
 # Ini akan menggunakan .env dari build context (yang berbasis .env.example)
@@ -88,7 +89,7 @@ RUN apk add --no-cache \
     libxml2 \
     libpng \
     jpeg \
-    freetype \ 
+    freetype \
     oniguruma \
     icu-libs \
     libzip
