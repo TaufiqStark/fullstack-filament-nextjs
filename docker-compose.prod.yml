@@ -83,11 +83,15 @@ services:
       - "${PROD_CLIENT_PORT:-80}:3000" # Client biasanya di port 80 (HTTP) atau 443 (HTTPS via reverse proxy)
     environment:
       NODE_ENV: production
-      PORT: 3000 # Port internal Next.js
-      # NEXT_PUBLIC_API_URL sudah di-bake ke dalam image saat build oleh CI
-      # Jika ada ENV runtime lain yang dibutuhkan Next.js, tambahkan di sini
-      # dan ambil dari .env server
-      # ANOTHER_CLIENT_ENV_VAR: ${PROD_ANOTHER_CLIENT_ENV_VAR}
+      PORT: 3000
+      # Variabel koneksi database untuk API routes di Next.js:
+      DB_HOST: db  # <-- PASTIKAN INI ADA DAN BERNILAI 'db' (atau nama service database Anda)
+      DB_PORT: 5432 # Atau ${PROD_DB_PORT:-5432} jika Anda ingin fleksibel
+      DB_NAME: ${PROD_DB_NAME} # Diambil dari .env server
+      DB_USER: ${PROD_DB_USER}   # Diambil dari .env server
+      DB_PASSWORD: ${PROD_DB_PASSWORD} # Diambil dari .env server
+      # NEXT_PUBLIC_API_URL sudah di-bake saat build image,
+      # tapi jika ada var runtime lain, bisa ditambahkan di sini.
     depends_on:
       - db # Jika client butuh DB langsung, atau admin-app-php jika API-nya di sana
     networks:
