@@ -1,0 +1,39 @@
+# Direktori Git
+.git
+.gitignore
+.gitattributes
+
+# File environment lokal. Ini SANGAT PENTING untuk keamanan.
+# Environment untuk kontainer diatur oleh docker-compose.yml.
+# .env
+# .env.example
+
+# Folder dependensi Node.js
+# Ini akan di-install di dalam Dockerfile jika diperlukan (untuk build frontend).
+node_modules/
+
+# Folder dependensi Composer.
+# Ini akan di-install oleh perintah `composer install` di dalam Dockerfile.
+# Mengirim folder vendor lokal akan memperlambat build dan bisa menyebabkan konflik.
+vendor/
+
+# File dan folder sementara Laravel
+storage/framework/
+storage/logs/
+storage/app/public/
+
+# Aset publik yang di-compile
+# Ini biasanya dibuat oleh Laravel Mix/Vite.
+public/build/
+public/hot
+public/storage
+
+# File spesifik sistem operasi dan IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# File log lainnya
+npm-debug.log*
+yarn-error.log
