@@ -1,18 +1,22 @@
 # proyek-fullstack/admin-app/Dockerfile
-FROM php:8.3-fpm-alpine AS base
 
-LABEL maintainer="Taufiq <taufiq.ama@proton.me>"
+# --- Tahap 1: Builder ---
+FROM php:8.3-fpm-alpine AS builder
+
+LABEL maintainer="Nama Anda <emailanda@example.com>"
 LABEL app="Admin App (Laravel)"
 
 WORKDIR /var/www/html
 
 # Install system dependencies (termasuk untuk pgsql, zip, gd, intl)
-# Alpine packages: https://pkgs.alpinelinux.org/packages
 RUN apk add --no-cache \
     curl \
     zip \
     unzip \
     git \
+    supervisor \
+    # Nginx tidak perlu di sini jika kita menggunakan service Nginx terpisah di Docker Compose
+    # nginx \
     libzip-dev \
     libpng-dev \
     jpeg-dev \
@@ -23,8 +27,9 @@ RUN apk add --no-cache \
     oniguruma-dev
 
 # Install PHP extensions
+# Configure gd dengan jpeg dan freetype
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
+    && docker-php-ext-install \
         pdo pdo_pgsql pgsql \
         zip \
         gd \
@@ -36,30 +41,26 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         intl \
         mbstring
 
-# Dapatkan Composer
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Stage untuk dependensi Composer (agar bisa di-cache)
-FROM base AS composer_deps
+# Salin file composer terlebih dahulu untuk caching layer
 COPY composer.json composer.lock ./
-# Install dependensi (termasuk dev untuk development, --no-dev untuk produksi)
-# Untuk setup ini, kita buat image yang "siap deploy", jadi --no-dev
-# Jika Anda butuh dev-dependencies di kontainer, hapus --no-dev
+
+# Install dependensi PHP (tanpa dev, optimasi autoloader)
+# --no-scripts untuk mencegah error jika .env belum ada atau APP_KEY belum diset
 RUN composer install --optimize-autoloader --no-dev --no-interaction --no-plugins --no-scripts
 
-# Stage final aplikasi
-FROM base AS app
-COPY --from=composer_deps /var/www/html/vendor ./vendor
-# Salin seluruh kode aplikasi
+# Salin sisa kode aplikasi
 COPY . .
 
-# Buat file .env dari .env.example jika .env tidak ada
-# Ini penting karena .env seharusnya tidak ada di dalam image
-# Variabel lingkungan sebenarnya akan di-inject oleh Docker Compose saat runtime
+# Buat file .env dari .env.example jika .env tidak ada (untuk build time)
+# Di produksi, ENV vars akan di-inject oleh Docker Compose dari .env server
 RUN if [ ! -f ".env" ]; then cp .env.example .env; fi
 
-# Atur izin untuk storage dan bootstrap/cache
-# Ini penting agar Laravel bisa menulis log, cache, session, dll.
+
+# Siapkan direktori storage dan bootstrap/cache, lalu atur izin
+# Ini penting agar artisan command berikutnya tidak error
 RUN mkdir -p storage/framework/sessions \
              storage/framework/views \
              storage/framework/cache \
@@ -67,20 +68,48 @@ RUN mkdir -p storage/framework/sessions \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# Generate APP_KEY jika belum ada di .env yang baru dicopy dari .env.example
-# Perintah ini akan menulis ke file .env di dalam image jika APP_KEY kosong
-RUN php artisan key:generate --show
-# Tambahkan --show agar tidak error jika key sudah ada
+# Generate APP_KEY (akan ditulis ke .env di build context ini)
+RUN php artisan key:generate
 
-# Saat production, cache akan dibuat oleh CD script SETELAH ENV produksi di-set.
-# Untuk image ini, kita biarkan tanpa cache agar fleksibel untuk dev & prod.
-# Jika mau di-cache saat build:
+# Jalankan perintah optimasi Laravel
+# Ini akan menggunakan .env dari build context (yang berbasis .env.example)
+# Cache ini akan di-clear dan di-rebuild di server dengan ENV produksi oleh skrip CD
 RUN php artisan config:cache
 RUN php artisan route:cache
 RUN php artisan view:cache
 
+RUN rm .env 
+
+# --- Tahap 2: Final Production Image ---
+FROM php:8.3-fpm-alpine
+
+WORKDIR /var/www/html
+
+# Install hanya runtime libraries yang dibutuhkan
+RUN apk add --no-cache \
+    postgresql-libs \
+    libxml2 \
+    libpng \
+    jpeg \
+    freetype \
+    oniguruma \
+    icu-libs \
+    libzip
+
+# Salin artefak dari builder stage
+COPY --from=builder /var/www/html .
+COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+
+# Pastikan izin sudah benar di image final
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
 # Set user ke www-data
 USER www-data
 
+# Ekspos port PHP-FPM
 EXPOSE 9000
+
+# Perintah default untuk menjalankan PHP-FPM
 CMD ["php-fpm"]
