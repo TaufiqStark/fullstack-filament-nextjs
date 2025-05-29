@@ -31,8 +31,8 @@ services:
       - admin_bootstrap_cache_prod:/var/www/html/bootstrap/cache
     environment:
       # Variabel ini akan diambil dari file .env di server yang dibuat oleh CD
-      APP_ENV: production
-      APP_DEBUG: false
+      APP_ENV: local
+      APP_DEBUG: true
       APP_URL: ${PROD_ADMIN_APP_URL}
       APP_KEY: ${PROD_APP_KEY}
       DB_CONNECTION: pgsql
